@@ -10,6 +10,8 @@ SWF::Chart - Perl interface to the SWF Chart generation tool
 
   use SWF::Chart;
 
+  $g = SWF::Chart->new;
+
   $g->set_titles(qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec));
 
   $g->add_dataset([qw(1 3 5 7 11 13 17 23 29 31 37 41)],
@@ -19,8 +21,8 @@ SWF::Chart - Perl interface to the SWF Chart generation tool
                       size  => 10,
                       color => '333333');
 
-  $g->chart_bg(positive_color => '555555',
-               positive_alpha => 100);
+  $g->chart_rect(positive_color => '555555',
+                 positive_alpha => 100);
 
   $g->series_color('DEADBE');
 

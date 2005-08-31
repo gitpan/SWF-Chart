@@ -1,3 +1,7 @@
+1.1 31 Aug 2005
+    - Fixed incorrect package name in Makefile.PL
+    - Updated example in POD
+
 1.0 28 July 2005
     - First released version
     - Updated for XML/SWF Charts v4.1
