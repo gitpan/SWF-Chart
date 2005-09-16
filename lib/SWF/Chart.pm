@@ -10,12 +10,20 @@ SWF::Chart - Perl interface to the SWF Chart generation tool
 
   use SWF::Chart;
 
-  $g = SWF::Chart->new;
+  my $g = SWF::Chart->new;
 
   $g->set_titles(qw(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec));
 
+  # Add a single data set
+  $g->add_dataset(1, 3, 5, 7, 2, 4, 6);
+
+  # Add multiple datasets
   $g->add_dataset([qw(1 3 5 7 11 13 17 23 29 31 37 41)],
                   [qw(1 1 2 3 5 8 13 21 34 55 89 144)]);
+
+  # Add multiple datasets with labels
+  $g->add_dataset('Label 1' => \@set1,
+                  'Label 2' => \@set2);
 
   $g->text_properties(bold  => 0,
                       size  => 10,
@@ -68,7 +76,7 @@ use strict;
 #--------------------------------------#
 # Global Variables
 
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 #--------------------------------------#
 # Constants
@@ -132,7 +140,7 @@ use constant OPTIONS => {
 
                          chart_type       => ['elem', 1],
                          chart_value      => ['elem'],
-                         chart_value_text => ['elem'],
+                         chart_value_text => ['container', 'string'],
 
                          draw_circle      => ['container', 'circle'],
                          draw_image       => ['container', 'image'],
@@ -211,13 +219,20 @@ sub set_titles {
 
     # Make sure to include the required empty cell for the title row
     unshift @{$self->{rows}->[0]},  undef;
+
+    return 1;
 }
 
 =pod
 
-=item $g->add_dataset(\@row1, \@row2, \@rows)
+=item $g->add_dataset(@row);
 
-Adds rows of data to be charted.  Accepts a list of array references.  If this method is called more than once, each row is added after the existing rows rather than replacing them.
+=item $g->add_dataset(\@row1, \@row2, \@row3)
+
+=item $g->add_dataset('Region A' => \@row1,
+                      'Region B' => \@row2)
+
+Adds rows of data to be charted.  Accepts a list of values for a single row, a list of array references for multiple rows or a hash where the key is the row label and the value is an array reference of values for that row.  If this method is called more than once, each row is added after the existing rows rather than replacing them.
 
 =cut
 
@@ -228,7 +243,59 @@ sub add_dataset {
     # Initialize rows with a blank first row saved for the titles
     $self->{rows} ||= [undef];
 
-    push @{$self->{rows}}, ref $set[0] ? $set[0] : \@set;
+    # Reformat to be in the form (label => \@row)
+    if ($set[0] and ref $set[0]) {
+        @set = map { undef, $_ } @set;
+    } elsif ($set[1] and not ref $set[1]) {
+        @set = (undef, [@set]);
+    }
+
+    while (@set) {
+        my ($label, $r) = (shift @set, shift @set);
+
+        # Add the label
+        unshift @$r, $label;
+        push @{$self->{rows}}, $r;
+    }
+
+    return 1;
+}
+
+=pod
+
+=item $g->chart_value_text(@row);
+
+=item $g->chart_value_text(\@row1, \@row2, \@row3)
+
+Adds alternate text for the values displayed.  Accepts a list of values for a single row or a list of array references for multiple rows.  If this method is called more than once, each row's alternate text is added after the existing rows rather than replacing them.
+
+=cut
+
+sub chart_value_text {
+    my $self = shift;
+    my (@text) = @_;
+    my @add_rows = ref $text[0] ? @text : (\@text);
+
+    return unless @add_rows;
+
+    my @rows = ['row', undef, [(['null']) x (scalar(@{$add_rows[0]})+1)]];
+    my $data = $self->{opts}->{'chart_value_text'} ||=
+               ['chart_value_text', undef, \@rows];
+
+    foreach my $r (@add_rows) {
+        my @str;
+        push @{$data->[2]}, ['row', undef, \@str];
+
+        foreach my $t (undef, @$r) {
+            if (defined $t) {
+                push @str, ['string', undef, $t];
+            } else {
+                push @str, ['null'];
+            }
+        }
+    }
+
+    return 1;
 }
 
 =pod
@@ -527,26 +594,36 @@ sub AUTOLOAD {
 
 sub xml {
     my $self = shift;
+    my (%param) = @_;
+    my $format = $param{format} || 0;
+
     my $output = '<?xml version="1.0" encoding="utf-8"?><chart>';
+    $output .= "\n" if $format;
 
     # Output all the chart preferences and settings
     foreach my $opt (keys %{$self->{opts}}) {
         $output .= $self->_elem_as_string($self->{opts}->{$opt});
+        $output .= "\n" if $format;
     }
 
     # Output the data for this chart
     $output .= '<chart_data>';
+    $output .= "\n" if $format;
     my $rows = $self->{rows};
 
     # Write the labels for the chart
     $output .= $self->_xml_chart_data_labels($rows->[0]);
+    $output .= "\n" if $format;
 
     # Write the rows
     foreach my $r (@$rows[1..$#$rows]) {
         $output .= $self->_xml_chart_data_row($r);
+        $output .= "\n" if $format;
     }
 
     $output .= '</chart_data>';
+    $output .= "\n" if $format;
+
     $output .= '</chart>';
 
     return $output;
