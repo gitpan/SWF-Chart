@@ -42,7 +42,11 @@ This module is the Perl interface to the SWF Charts flash graphing tool.  It con
 
   http://www.maani.us/charts/index.php?menu=Reference
 
-Note that there are a few extra helper functions that this module provides.
+When using this module, please be sure to use the latest version of the XML/SWF
+Charts flash movie.  Earlier versions of that flash movie supported a different
+XML structure for which this module is not backward compatible.
+
+Note that there are a few extra helper functions that this module provides:
 
 =over 4
 
@@ -76,7 +80,10 @@ use strict;
 #--------------------------------------#
 # Global Variables
 
-our $VERSION = '1.2';
+our $VERSION = '1.3';
+
+# What version of the XML/SWF Charts flash module do we support?
+our $SWF_VERSION = '4.5';
 
 #--------------------------------------#
 # Constants
@@ -141,12 +148,6 @@ use constant OPTIONS => {
                          chart_type       => ['elem', 1],
                          chart_value      => ['elem'],
                          chart_value_text => ['container', 'string'],
-
-                         draw_circle      => ['container', 'circle'],
-                         draw_image       => ['container', 'image'],
-                         draw_line        => ['container', 'line'],
-                         draw_rect        => ['container', 'rect'],
-                         draw_text        => ['container', 'text'],
 
                          legend_label      => ['elem'],
                          legend_rect       => ['elem'],
@@ -500,23 +501,68 @@ These methods can be called more than once.  Each time they are called they add 
 
 =item *
 
+$g->draw($thing1 => $param, $thing2 => $param, ...)
+
+Draw one or more primitives to the chart.  Options for $thing are:
+
+=over 4
+
+=item circle
+
+=item image
+
+=item line
+
+=item rect
+
+=item text
+
+=back
+
+Valid options for the $param hash are the parameters given for the elements of
+the same name within the 'draw' command L<http://www.maani.us/xml_charts/index.php?menu=Reference&submenu=draw>
+
+The only difference is when drawing 'text' you must pass the value for the text
+via a 'value' key to the $param hash.  Example:
+
+  $g->draw(text => {bold  => 1,
+                    x     => 20,
+                    y     => 20,
+                    value => 'The quick brown fox',
+                   },
+           line => { ... },
+           ...
+          )
+
+=item *
+
 $g->draw_circle(%param)
+
+Same as $g->draw(circle => \%param)
 
 =item *
 
 $g->draw_image(%param)
 
+Same as $g->draw(image => \%param)
+
 =item *
 
 $g->draw_line(%param)
+
+Same as $g->draw(line => \%param)
 
 =item *
 
 $g->draw_rect(%param)
 
+Same as $g->draw(rect => \%param)
+
 =item *
 
 $g->draw_text($text, %param)
+
+Same as $g->draw(text => \%param)
 
 =item *
 
@@ -530,10 +576,29 @@ $g->series_explode($value)
 
 =cut
 
+sub draw {
+    my $self = shift;
+    my (%items) = @_;
+
+    foreach my $type (keys %items) {
+        my $opts  = $items{$type};
+        my $value = $opts->{value};
+        $value = delete $opts->{value} if $type eq 'text';
+        $self->_draw_thing($type, $value, $opts);
+    }
+}
+
+sub draw_circle { shift->_draw_thing('circle', undef, @_) }
+
+sub draw_image  { shift->_draw_thing('image', undef, @_)  }
+
+sub draw_line   { shift->_draw_thing('line', undef, @_)   }
+
+sub draw_rect   { shift->_draw_thing('rect', undef, @_)   }
+
 sub draw_text {
     my $self = shift;
     my ($text, %param) = @_;
-    my $data = $self->{opts}->{draw_text} ||= ['draw_text', undef, []];
     my $text_defaults = $self->{defaults}->{text_props};
 
     # If there are defaults copy them to the unset values
@@ -544,7 +609,22 @@ sub draw_text {
         }
     }
 
-    push @{$data->[2]}, ['text', \%param, $text];
+    $self->_draw_thing('text', $text, \%param);
+}
+
+sub _draw_thing {
+    my $self = shift;
+    my ($thing, $value) = (shift, shift);
+
+    # Accept either a hash or a hash ref as the fourth arg of @_
+    my $param = ref $_[0] ? $_[0] : {@_};
+    my $data  = $self->{opts}->{draw} ||= ['draw', undef, []];
+
+    if ($thing eq 'text') {
+        push @{$data->[2]}, [$thing, $param, $value];
+    } else {
+        push @{$data->[2]}, [$thing, $param];
+    }
 }
 
 use vars qw( $AUTOLOAD );
@@ -711,7 +791,7 @@ Garth Webb <garth@sixapart.com>
 
 =head1 VERSION
 
-Version 1.0 (27 June 2005)
+Version 1.3 (11 Jan 2006)
 
 =head1 SEE ALSO
 
