@@ -80,7 +80,7 @@ use strict;
 #--------------------------------------#
 # Global Variables
 
-our $VERSION = '1.3';
+our $VERSION = '1.4';
 
 # What version of the XML/SWF Charts flash module do we support?
 our $SWF_VERSION = '4.5';
@@ -144,7 +144,7 @@ use constant OPTIONS => {
                          chart_grid_v     => ['elem'],
                          chart_pref       => ['elem'],
                          chart_rect       => ['elem'],
-
+                         chart_transition => ['elem'],
                          chart_type       => ['elem', 1],
                          chart_value      => ['elem'],
                          chart_value_text => ['container', 'string'],
@@ -155,7 +155,6 @@ use constant OPTIONS => {
 
                          link             => ['elem'],
                          link_data        => ['elem'],
-
                          live_update      => ['elem'],
 
                          series_color     => ['container', 'color'],
@@ -246,7 +245,7 @@ sub add_dataset {
 
     # Reformat to be in the form (label => \@row)
     if ($set[0] and ref $set[0]) {
-        @set = map { undef, $_ } @set;
+        @set = map { undef, [@$_] } @set;
     } elsif ($set[1] and not ref $set[1]) {
         @set = (undef, [@set]);
     }
